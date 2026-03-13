@@ -1,0 +1,70 @@
+# Upgrade to OpenAI Tool-Calling Agent Architecture
+
+Replace manual intent classification ([classify_intent_node](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py#139-246) → conditional routing) with OpenAI's native tool-calling. The LLM decides when to call [send_email](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/tools/email_tool.py#19-72) or [schedule_meeting](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py#248-382); otherwise it replies normally.
+
+**Preserved (not modified):** confirmation guard, [send_email()](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/tools/email_tool.py#19-72) logic, [create_calendar_event()](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/tools/calendar_tool.py#8-33) logic, database memory, session store, [handle_confirmation](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py#70-134), voice/TTS.
+
+## Proposed Changes
+
+### LLM Tool Definitions
+
+#### [MODIFY] [llm_tool.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/tools/llm_tool.py)
+
+- Add the `tools` list with [send_email](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/tools/email_tool.py#19-72) and [schedule_meeting](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py#248-382) function schemas (exactly as specified by user)
+- Keep [_safe_json_loads](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/tools/llm_tool.py#11-27) and [extract_intent_with_llm](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/tools/llm_tool.py#29-129) for now (they may still be referenced elsewhere), but they will no longer be called from the main flow
+
+---
+
+### Unified Agent Node
+
+#### [MODIFY] [nodes.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py)
+
+- **Add** new function `agent_node(state: State) -> State` that:
+  1. Loads session history, profile, summary (reuses existing memory logic from [normal_chat_node](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py#448-592))
+  2. Builds messages with system prompt (Frosty persona + company knowledge)
+  3. Calls OpenAI with `tools=tools, tool_choice="auto"` using the `openai` client directly (not LangChain, since LangChain's `ChatOpenAI` doesn't expose raw tool_calls the same way)
+  4. If response has `tool_calls`:
+     - [send_email](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/tools/email_tool.py#19-72) → sets `recipient`, `subject`, `body`, `awaiting_confirmation=True` in state (preserves confirmation guard)
+     - [schedule_meeting](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py#248-382) → calls existing date parsing + [create_calendar_event()](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/tools/calendar_tool.py#8-33) logic
+  5. If no tool calls → returns the assistant's text reply as normal chat
+  6. Saves messages to session store
+- **Remove** [classify_intent_node](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py#139-246) function
+- **Remove** [email_flow_node](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py#384-446) function (its logic is absorbed into `agent_node`, respecting confirmation guard)
+- **Keep** [handle_confirmation](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py#70-134) unchanged
+- **Keep** [extract_email_node](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py#31-69) (still used by state)
+- **Keep** [normal_chat_node](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py#448-592) (could be kept as fallback, but the main flow goes through `agent_node`)
+
+---
+
+### Graph Routing
+
+#### [MODIFY] [main.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/main.py)
+
+- Replace the multi-node conditional graph with a simpler flow:
+  - Entry: confirmation guard check → [handle_confirmation](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py#70-134) OR `agent_node`
+  - `agent_node` → `__end__`
+  - [handle_confirmation](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py#70-134) → `__end__`
+- Remove imports of [classify_intent_node](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py#139-246), [email_flow_node](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py#384-446), [schedule_meeting_node](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py#248-382), [normal_chat_node](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py#448-592)
+- Remove [route_by_intent](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/main.py#24-27) function
+- Keep [chat_router](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/main.py#63-92) and [route_entry](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/main.py#28-32) logic (confirmation guard stays)
+
+---
+
+### OpenAI Dependency
+
+> [!IMPORTANT]
+> This change requires the `openai` Python package (direct client, not just `langchain-openai`). We'll use `from openai import OpenAI` for native tool-calling support. Need to verify it's installed or install it.
+
+## Verification Plan
+
+### Manual Verification
+
+Since there are no existing tests and the system is an API server, verification will be done by:
+
+1. **Start the server**: `cd c:\Users\ayush\OneDrive\Desktop\frosty-langgraph && python -m uvicorn app:app --reload --port 8000`
+2. **Test normal chat**: `curl -X POST http://localhost:8000/chat -H "Content-Type: application/json" -d "{\"session_id\":\"test-1\",\"message\":\"Hi\"}"` — should return a normal Frosty reply (no tool call)
+3. **Test email flow**: `curl -X POST http://localhost:8000/chat -H "Content-Type: application/json" -d "{\"session_id\":\"test-2\",\"message\":\"Send an email to rahul@gmail.com with subject Hello and body How are you\"}"` — should trigger send_email tool call and ask for confirmation
+4. **Test meeting flow**: `curl -X POST http://localhost:8000/chat -H "Content-Type: application/json" -d "{\"session_id\":\"test-3\",\"message\":\"Schedule a meeting tomorrow at 5 PM titled Standup with Rahul\"}"` — should trigger schedule_meeting tool call and return calendar link
+
+> [!NOTE]
+> Testing requires valid `OPENAI_API_KEY` in [.env](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/.env). Calendar test requires `GOOGLE_APPLICATION_CREDENTIALS`. Email confirmation test requires hitting `/chat` again with "yes" on the same session.

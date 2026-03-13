@@ -1,0 +1,266 @@
+# Frosty LangGraph Backend — Comprehensive Project Report
+
+**Project:** Frosty AI Assistant Backend  
+**Company:** Frostrek LLP  
+**Report Date:** 2026-03-02  
+**Stack:** Python 3.14 · FastAPI · LangGraph · OpenAI GPT-4o-mini · PostgreSQL · FAISS · Google Calendar API · SMTP
+
+---
+
+## 1. Executive Summary
+
+Frosty is a production-grade AI assistant backend built on **LangGraph** (stateful graph-based orchestration) with **FastAPI** as the API layer. It provides multi-modal conversational capabilities including text chat, voice input/output, email composition & sending, meeting scheduling via Google Calendar, and RAG-powered knowledge retrieval — all backed by persistent session memory in PostgreSQL.
+
+The system is currently **functional and running locally** at `http://localhost:8000`. Recent fixes (2026-03-02) resolved a database schema issue, logging failure, and response flow reliability.
+
+---
+
+## 2. Architecture Overview
+
+```mermaid
+graph TD
+    A["Client (Web/API)"] -->|POST /chat| B["FastAPI App (app.py)"]
+    A -->|POST /api/v1/chat| B
+    B --> C["chat_router (main.py)"]
+    C -->|awaiting_confirmation?| D["handle_confirmation"]
+    C -->|else| E["LangGraph State Machine"]
+    E --> F["classify_intent_node"]
+    F -->|normal_chat| G["normal_chat_node"]
+    F -->|schedule_meeting| H["schedule_meeting_node"]
+    F -->|send_email / send_email_only| I["email_flow_node"]
+    F -->|missing_information| G
+    G --> J["OpenAI GPT-4o-mini"]
+    H --> K["Google Calendar API"]
+    I --> L["SMTP Email"]
+    F --> M["RAG Engine (FAISS)"]
+    G --> M
+    B --> N["chat_logger → PostgreSQL"]
+    C --> O["session_store → PostgreSQL"]
+```
+
+### Request Flow
+
+```
+Client POST → FastAPI endpoint → chat_router()
+  → (if awaiting_confirmation) → handle_confirmation() → return
+  → (else) → LangGraph.invoke(state)
+    → classify_intent_node (LLM intent + entity extraction)
+    → route_by_intent
+      → normal_chat_node | schedule_meeting_node | email_flow_node
+  → save_session_state()
+  → return api_response to client
+```
+
+---
+
+## 3. Complete File Inventory
+
+### Core Application (5 files)
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| [app.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/app.py) | 262 | FastAPI server, `/chat` and `/api/v1/chat` endpoints, rate limiter, TTS integration |
+| [main.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/main.py) | 118 | LangGraph state machine definition, [chat_router()](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/main.py#69-104) entry point |
+| [nodes.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py) | 740 | All graph nodes: [classify_intent_node](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py#176-387), [normal_chat_node](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py#622-740), [schedule_meeting_node](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py#385-512), [email_flow_node](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py#518-620), [handle_confirmation](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py#73-171), [extract_email_node](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py#34-72) |
+| [state.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/state.py) | 205 | TypedDict state schema: 15+ typed sub-blocks (Session, Intent, Email, Meeting, Voice, etc.) |
+| [config.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/config.py) | 22 | Settings class loading env vars (OpenAI, ElevenLabs, SendGrid, DB, Google OAuth) |
+
+### Database & Storage (2 files)
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| [db_config.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/db_config.py) | 153 | DB connection, table creation (6 tables), safe ALTER TABLE migrations |
+| [session_store.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/session_store.py) | 449 | Full session persistence: history, state, summaries, user profiles, pending actions |
+
+### Tools (7 files)
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| [tools/email_tool.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/tools/email_tool.py) | 73 | SMTP email sender with TLS, configurable via env vars |
+| [tools/calendar_tool.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/tools/calendar_tool.py) | 142 | Google Calendar: create events, check availability, find next available slot |
+| [tools/voice_tool.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/tools/voice_tool.py) | 43 | OpenAI Whisper STT (base64 audio → text) |
+| [tools/tts_tool.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/tools/tts_tool.py) | 32 | OpenAI TTS (text → base64 audio) using `gpt-4o-mini-tts` |
+| [tools/chat_logger.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/tools/chat_logger.py) | 60 | Analytics chat logging to `chat_logs` table (non-blocking) |
+| [tools/llm_tool.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/tools/llm_tool.py) | — | LLM intent extraction utility |
+| [tools/tool_wrapper.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/tools/tool_wrapper.py) | — | `execute_with_retry()` wrapper with retries and timeout |
+
+### Memory System (3 files)
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| [memory/user_profile.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/memory/user_profile.py) | 94 | Regex-based profile extraction (name, email) from messages, DB persistence |
+| [memory/summary.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/memory/summary.py) | 182 | LLM-powered conversation summarization, auto-prune at 20+ messages |
+| [memory/__init__.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/memory/__init__.py) | — | Package init |
+
+### Services (3 files)
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| [services/rag_engine.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/services/rag_engine.py) | 164 | FAISS vector index + OpenAI `text-embedding-3-small` for RAG retrieval |
+| [services/google_sheets_loader.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/services/google_sheets_loader.py) | — | Google Sheets data loader for dynamic knowledge base |
+| [services/__init__.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/services/__init__.py) | — | Package init |
+
+### Configuration & Infrastructure (4 files)
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| [core/system_prompt.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/core/system_prompt.py) | 43 | Canonical Frosty persona prompt with scope restrictions |
+| [knowledge_base.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/knowledge_base.py) | 69 | Static company knowledge (services, about, FAQ, contact, etc.) |
+| [logger_config.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/logger_config.py) | — | Python logger setup |
+| [Dockerfile](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/Dockerfile) | — | Containerization config |
+
+**Total: 27 source files, ~2,800+ lines of application code**
+
+---
+
+## 4. Database Schema
+
+6 PostgreSQL tables are created at startup via [init_conversation_table()](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/db_config.py#15-125):
+
+| Table | Purpose | Key Columns |
+|-------|---------|-------------|
+| `conversation_memory` | Per-message chat history | `session_id`, `role`, `content`, `created_at` |
+| [session_state](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/session_store.py#85-123) | Serialized session state (JSON) | `session_id`, `state_data`, [conversation_summary](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/session_store.py#161-199), `last_tool_used`, `action_pending`, `pending_action_data` |
+| [user_profile](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/memory/user_profile.py#23-37) | Extracted user facts | `session_id`, `name`, [email](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/tools/email_tool.py#19-72), `preferred_language`, `timezone` |
+| [conversation_summary](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/session_store.py#161-199) | LLM-generated summaries | `session_id`, [summary](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/session_store.py#161-199) |
+| `chat_logs` | Analytics-grade logs | `session_id`, `user_id`, `role`, [message](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/session_store.py#50-83), [intent](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/main.py#25-34), `created_at` |
+
+> [!NOTE]
+> The `chat_logs` table now includes safe ALTER TABLE migrations for [intent](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/main.py#25-34) and `user_id` columns, handling pre-existing tables that were created before these columns existed (fix applied 2026-03-02).
+
+---
+
+## 5. Feature Inventory
+
+### ✅ Implemented & Working
+
+| Feature | Status | Details |
+|---------|--------|---------|
+| **Text Chat** | ✅ Live | GPT-4o-mini with system prompt, conversation context, RAG |
+| **Intent Classification** | ✅ Live | LLM-based JSON extraction: [normal_chat](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py#622-740), [schedule_meeting](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py#385-512), [send_email](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/tools/email_tool.py#19-72), `send_email_only`, `missing_information` |
+| **Email Composition & Sending** | ✅ Live | LLM drafts email, confirmation flow, SMTP sending with retry |
+| **Meeting Scheduling** | ✅ Live | Google Calendar: create events, check conflicts, suggest alternatives |
+| **Voice Input (STT)** | ✅ Live | OpenAI Whisper, base64 audio input |
+| **Voice Output (TTS)** | ✅ Live | OpenAI `gpt-4o-mini-tts`, base64 audio response |
+| **RAG Knowledge Retrieval** | ✅ Live | FAISS + `text-embedding-3-small`, from static KB + Google Sheets |
+| **Session Memory** | ✅ Live | PostgreSQL-backed conversation history (last 10 messages) |
+| **Conversation Summarization** | ✅ Live | Auto-summarize at 20+ messages, prune to keep last 10 |
+| **User Profile Memory** | ✅ Live | Regex extraction of name/email, persisted to DB |
+| **Confirmation Flow** | ✅ Live | 30-minute window, yes/no handling, pending action persistence |
+| **Rate Limiting** | ✅ Live | 20 requests/minute per session (in-memory) |
+| **Public API** | ✅ Live | `/api/v1/chat` with optional API key auth |
+| **Analytics Logging** | ✅ Live | Non-blocking chat_logs with session, role, message, intent |
+| **Docker Support** | ✅ Ready | Dockerfile present |
+
+### API Endpoints
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `POST` | `/chat` | None | Primary chat endpoint (text + audio + TTS) |
+| `POST` | `/api/v1/chat` | Optional `X-API-Key` | Public API with structured response model |
+| `GET` | `/health` | None | Health check |
+
+---
+
+## 6. LangGraph State Machine
+
+```mermaid
+stateDiagram-v2
+    [*] --> route_entry
+    route_entry --> handle_confirmation: awaiting_confirmation=true
+    route_entry --> classify_intent: else
+    
+    handle_confirmation --> [*]
+    
+    classify_intent --> normal_chat: intent=normal_chat
+    classify_intent --> schedule_meeting: intent=schedule_meeting
+    classify_intent --> email_flow: intent=send_email/send_email_only
+    classify_intent --> normal_chat: intent=missing_information
+    classify_intent --> email_flow: intent=confirmation_reply
+    
+    normal_chat --> [*]
+    schedule_meeting --> [*]
+    email_flow --> [*]
+```
+
+**Valid Intents:** [schedule_meeting](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py#385-512), [send_email](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/tools/email_tool.py#19-72), `send_email_only`, `missing_information`, [normal_chat](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py#622-740), `confirmation_reply`
+
+---
+
+## 7. Recent Fixes (2026-03-02)
+
+### Issues Resolved
+
+| # | Issue | Root Cause | Fix |
+|---|-------|-----------|-----|
+| 1 | `column "intent" does not exist` in `chat_logs` | Table created before [intent](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/main.py#25-34) column was added | Safe ALTER TABLE migration in [db_config.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/db_config.py) |
+| 2 | Logging failure interrupting response flow | [log_chat()](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/tools/chat_logger.py#15-63) exceptions could propagate | Double try/except (in [chat_logger.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/tools/chat_logger.py) + [app.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/app.py)), print debug |
+| 3 | Fallback greeting returned repeatedly | Unclear response flow in `/chat` endpoint | Explicit 4-step flow: generate → debug → log → return |
+| 4 | Insufficient debug visibility | No console-visible diagnostics | Added `print()` across 5 files: [app.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/app.py), [nodes.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py), [main.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/main.py), [chat_logger.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/tools/chat_logger.py) |
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| [db_config.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/db_config.py) | +10 lines — safe ALTER TABLE for [intent](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/main.py#25-34) and `user_id` |
+| [tools/chat_logger.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/tools/chat_logger.py) | Rewritten — non-blocking with print debug on errors |
+| [app.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/app.py) | +10 lines — 5 debug prints, explicit 4-step flow comments |
+| [nodes.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py) | +7 lines — debug prints in [classify_intent_node](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py#176-387) and [normal_chat_node](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py#622-740) |
+| [main.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/main.py) | +1 line — debug print in [chat_router](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/main.py#69-104) |
+
+### Enforced Response Flow
+
+```
+receive user_message
+  → generate llm_response (via LangGraph)
+  → safely attempt log_chat() (non-blocking, try/except)
+  → return llm_response (never overridden by logging errors)
+```
+
+---
+
+## 8. Technology Dependencies
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| `fastapi` | Latest | API framework |
+| `langchain-openai` | Latest | OpenAI LLM integration |
+| `langgraph` | Latest | Stateful graph orchestration |
+| `openai` | Latest | Embeddings, Whisper STT, TTS |
+| `psycopg2` | Latest | PostgreSQL driver |
+| `faiss-cpu` | Latest | Vector similarity search |
+| `pydantic` | Latest | Request/response validation |
+| `python-dotenv` | Latest | Environment variable loading |
+| `google-api-python-client` | Latest | Google Calendar API |
+| `numpy` | Latest | Embedding array operations |
+
+---
+
+## 9. Current Status
+
+| Aspect | Status |
+|--------|--------|
+| **Server** | Running locally on port 8000 |
+| **Database** | PostgreSQL connected, all 6 tables initialized |
+| **LLM** | OpenAI GPT-4o-mini operational |
+| **Chat endpoint** | `/chat` — functional with debug logging |
+| **Public API** | `/api/v1/chat` — functional |
+| **Email sending** | SMTP configured and operational |
+| **Calendar** | Google Calendar API integrated |
+| **Voice I/O** | Whisper STT + OpenAI TTS integrated |
+| **RAG** | FAISS index with static KB + Google Sheets |
+| **Debug logging** | Console `print()` traces full request pipeline |
+
+---
+
+## 10. Recommendations for Next Steps
+
+1. **Testing:** Run integration tests against `/chat` and `/api/v1/chat` with various intents to validate end-to-end
+2. **Remove debug prints:** Once stable, convert `print()` statements to `logger.debug()` for production
+3. **Async logging:** Consider background task for [log_chat()](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/tools/chat_logger.py#15-63) to fully decouple from request latency
+4. **Error monitoring:** Add structured error tracking (e.g., Sentry) for production deployment
+5. **Load testing:** Validate the in-memory rate limiter under concurrent load
+
+---
+
+*Report generated by Antigravity AI — 2026-03-02T13:36Z*

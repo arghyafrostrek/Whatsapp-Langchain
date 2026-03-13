@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+openai
+langchain-openai
+langchain-core
+langgraph
+pydantic
+psycopg2-binary
+python-dotenv
+google-api-python-client
+google-auth
+requests
+PyMuPDF
+python-docx
+httpx

@@ -1,0 +1,28 @@
+# Frosty LangGraph Implementation Plan
+
+## 1. Project Setup
+- [ ] Create `requirements.txt` with dependencies (`langchain`, `langgraph`, `fastapi`, `supabase`, `slack-sdk`, etc.).
+- [ ] Create `.env.example` mapping out required Supabase, OpenAI, Google, and Slack API keys.
+
+## 2. Core & Processing Modules
+- [ ] Refactor [knowledge_base.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/knowledge_base.py) to `knowledge.py` per the plan.
+- [ ] Rename [tools/email_tool.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/tools/email_tool.py) to `email_utils.py` per the plan, ensuring Gmail Google API integration replaces basic SMPT if present.
+- [ ] Rename [tools/calendar_tool.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/tools/calendar_tool.py) to `calendar_service.py` per the plan.
+- [ ] Create `input_processor.py` for routing inputs (text/voice/image), handling OpenAI Whisper for voice and GPT-4o Vision for images.
+
+## 3. AI Agents Refactoring (`agents.py`)
+- [ ] Create `agents.py` to hold LLM logic, replacing inline LLM calls in [nodes.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py).
+- [ ] Implement Master Agent (intent detection).
+- [ ] Implement Frosty Chat Agent (main text response).
+- [ ] Implement Text-path Chat Agent.
+- [ ] Implement Meeting Intent Agent (detailed meeting extraction).
+- [ ] Implement Date Resolver.
+- [ ] Implement Meeting Email Generator.
+
+## 4. Graph & Server Architecture
+- [ ] Move LangGraph `StateGraph` definition from [main.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/main.py) into `graph.py` with full conditional edges (Input -> Pending Email -> Route Input -> Check Voice -> Agent Routing -> etc.).
+- [ ] Move FastAPI application from [app.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/app.py) to [main.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/main.py) per the plan. Add Webhook endpoint logic for text / image / voice (multipart). Add health check endpoint.
+
+## 5. Persistence & Notifications
+- [ ] Modify [db_config.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/db_config.py) / [session_store.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/session_store.py) into `persistence.py`. Integrate Supabase `chat_logs` and `conversation_state` tables.
+- [ ] Create `notifications.py` to handle Slack notifications for lead captures.

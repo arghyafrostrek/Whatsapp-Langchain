@@ -1,0 +1,277 @@
+# Frosty Stress Test Suite
+
+> **Purpose**: Verify Frosty behaves like a production assistant under all edge cases  
+> **Target Endpoint**: `POST /chat` and `GET /health`
+
+---
+
+## 1. Long Conversation Memory (50+ Messages)
+
+### Test 1.1 — Sliding Window Retention
+| Field | Detail |
+|---|---|
+| **Input** | Send 50 sequential messages to the same `session_id`. Message #1: `"My name is Ayush"`. Messages #2–49: random chitchat. Message #50: `"What is my name?"` |
+| **Expected** | Reply references "Ayush" — retrieved from user profile memory even though message #1 is outside the 10-message window |
+| **Failure** | Bot says "I don't know your name" or hallucinates a different name |
+
+### Test 1.2 — Context Coherence at Window Boundary
+| Field | Detail |
+|---|---|
+| **Input** | Send 12 messages. Messages #1–2 discuss "Project Alpha deadline is March 15". Messages #3–12 are unrelated. Message #13: `"When is the Project Alpha deadline?"` |
+| **Expected** | Bot recalls "March 15" via conversation summary (generated after 20+ messages) or profile memory |
+| **Failure** | Bot loses context and cannot answer — summary was not injected |
+
+---
+
+## 2. Conversation Summarization Trigger
+
+### Test 2.1 — Summary Generation at 20+ Messages
+| Field | Detail |
+|---|---|
+| **Input** | Send exactly 21 messages to a session. After message #21, query DB: `SELECT summary FROM conversation_summary WHERE session_id = ?` |
+| **Expected** | Summary exists, is non-empty, and preserves key facts from the conversation |
+| **Failure** | Summary is NULL or empty — [maybe_summarize_and_prune()](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/memory/summary.py#164-182) did not trigger |
+
+### Test 2.2 — History Pruning
+| Field | Detail |
+|---|---|
+| **Input** | After test 2.1, query DB: `SELECT COUNT(*) FROM conversation_memory WHERE session_id = ?` |
+| **Expected** | Count is ≤ 10 (pruned to last 10 messages) |
+| **Failure** | Count is > 10 — [prune_old_history()](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/memory/summary.py#124-162) did not execute |
+
+### Test 2.3 — Summary Injection After Pruning
+| Field | Detail |
+|---|---|
+| **Input** | After pruning, send `"Summarize what we discussed"` |
+| **Expected** | Bot responds with accurate summary from stored [conversation_summary](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/session_store.py#161-199) |
+| **Failure** | Bot says "We haven't discussed anything" — summary not injected into LLM context |
+
+---
+
+## 3. Multi-Step Email Confirmation
+
+### Test 3.1 — Happy Path
+| Field | Detail |
+|---|---|
+| **Input** | Message 1: `"Send an email to test@example.com Subject: Hello Message: Hi there"` → Message 2: `"yes"` |
+| **Expected** | Message 1 returns confirmation prompt with `awaiting_confirmation=True`. Message 2 returns `"Email sent successfully."` |
+| **Failure** | Email not sent, or confirmation not recognized |
+
+### Test 3.2 — Cancel Flow
+| Field | Detail |
+|---|---|
+| **Input** | Message 1: `"Send email to test@example.com Subject: Test Message: Body"` → Message 2: `"no"` |
+| **Expected** | Returns `"Email cancelled."`, `awaiting_confirmation` set to `False`, `pending_action_data` cleared |
+| **Failure** | Action still pending after cancel — [clear_pending_action()](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/session_store.py#418-449) not called |
+
+### Test 3.3 — Invalid Confirmation Input
+| Field | Detail |
+|---|---|
+| **Input** | Message 1: trigger email flow → Message 2: `"maybe"` |
+| **Expected** | Returns `"Please reply with yes or no."`, state stays `awaiting_confirmation=True` |
+| **Failure** | State gets corrupted or action executes without explicit yes |
+
+### Test 3.4 — Pending Action Persistence
+| Field | Detail |
+|---|---|
+| **Input** | Trigger email flow, then query DB for `pending_action_data` |
+| **Expected** | JSONB contains `{"recipient": "...", "subject": "...", "body": "..."}` and `action_pending=TRUE` |
+| **Failure** | `pending_action_data` is NULL — [set_pending_action()](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/session_store.py#337-372) not called |
+
+---
+
+## 4. Tool Retry Logic
+
+### Test 4.1 — Email Retry on Transient Failure
+| Field | Detail |
+|---|---|
+| **Input** | Temporarily set `SMTP_HOST` to an invalid host. Trigger email confirmation with `"yes"` |
+| **Expected** | Logs show 2 retry attempts. Response: `"Failed to send email: {reason}. Please try again."` |
+| **Failure** | Crashes with unhandled exception, or retries indefinitely |
+
+### Test 4.2 — Calendar Retry on Transient Failure
+| Field | Detail |
+|---|---|
+| **Input** | Temporarily invalidate Google credentials. Send meeting scheduling request |
+| **Expected** | Logs show 2 retry attempts. Response: `"Failed to schedule meeting: {reason}. Please try again."` |
+| **Failure** | Unhandled crash or `500` error returned to client |
+
+### Test 4.3 — Successful Retry After First Failure
+| Field | Detail |
+|---|---|
+| **Input** | Mock [send_email](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/tools/email_tool.py#19-72) to fail on first call, succeed on second |
+| **Expected** | Logs show `attempt=1/2 error=...` then `attempt=2/2 success`. Email delivered |
+| **Failure** | Gives up after first failure despite having retries remaining |
+
+---
+
+## 5. Calendar Scheduling Flow
+
+### Test 5.1 — Complete Meeting Scheduling
+| Field | Detail |
+|---|---|
+| **Input** | `"Schedule a meeting titled Project Review on 2026-03-15 at 10:00 with Rahul"` |
+| **Expected** | Returns `intent: "schedule_meeting"` with Google Calendar event link in reply |
+| **Failure** | Missing fields error, or calendar API failure without retry |
+
+### Test 5.2 — Missing Fields
+| Field | Detail |
+|---|---|
+| **Input** | `"Schedule a meeting tomorrow"` (no time, title, or participant) |
+| **Expected** | Returns prompt asking for missing fields: date, time, title, participant |
+| **Failure** | Attempts to create event with null fields, crashes |
+
+### Test 5.3 — Date Format Variations
+| Field | Detail |
+|---|---|
+| **Input** | Try each: `"2026-03-15"`, `"15-03-2026"`, `"03/15/2026"` with time `"2:00 PM"` |
+| **Expected** | All formats parsed correctly, events created |
+| **Failure** | Certain date formats cause `ValueError` |
+
+---
+
+## 6. Voice Pipeline (STT → Tool → TTS)
+
+### Test 6.1 — Audio Input to Text Response
+| Field | Detail |
+|---|---|
+| **Input** | `{"session_id": "v1", "audio": "<valid_base64_wav>", "voice_response": false}` |
+| **Expected** | [transcribe_audio()](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/tools/voice_tool.py#7-59) converts to text, LLM processes, returns text `reply` with empty `audio_response` |
+| **Failure** | Returns `"Could not process the provided input."` — Whisper STT failed |
+
+### Test 6.2 — Audio Input to Audio Response
+| Field | Detail |
+|---|---|
+| **Input** | `{"session_id": "v2", "audio": "<valid_base64_wav>", "voice_response": true}` |
+| **Expected** | Full pipeline: STT → LLM → TTS. Response contains non-empty `audio_response` and `audio_mime: "audio/wav"` |
+| **Failure** | `audio_response` is empty despite `voice_response=true` |
+
+### Test 6.3 — Invalid Audio Base64
+| Field | Detail |
+|---|---|
+| **Input** | `{"session_id": "v3", "audio": "not-valid-base64!!!"}` |
+| **Expected** | Caught by error handler, returns `intent: "error"` with user-friendly message |
+| **Failure** | Unhandled `ValueError` crashes the endpoint |
+
+---
+
+## 7. Interrupt During Pending Action
+
+### Test 7.1 — Normal Chat During Pending Email
+| Field | Detail |
+|---|---|
+| **Input** | Step 1: Trigger email flow (`awaiting_confirmation=True`). Step 2: Send `"What's the weather?"` instead of yes/no |
+| **Expected** | Confirmation guard catches all input — returns `"Please reply with yes or no."` |
+| **Failure** | Message bypasses confirmation guard and enters normal chat flow |
+
+### Test 7.2 — New Email Request During Pending Email
+| Field | Detail |
+|---|---|
+| **Input** | Step 1: Trigger email flow. Step 2: Send `"Send email to other@test.com Subject: New Message: Different"` |
+| **Expected** | Confirmation guard intercepts — does NOT start a new email flow while one is pending |
+| **Failure** | Overwrites pending action data, corrupting the first email |
+
+---
+
+## 8. Session Isolation
+
+### Test 8.1 — Cross-Session Memory Isolation
+| Field | Detail |
+|---|---|
+| **Input** | Session A: `"My name is Alice"`. Session B: `"What is my name?"` |
+| **Expected** | Session B does NOT know "Alice" — each session has independent memory |
+| **Failure** | Session B leaks data from Session A |
+
+### Test 8.2 — Cross-Session State Isolation
+| Field | Detail |
+|---|---|
+| **Input** | Session A: trigger email flow (`awaiting_confirmation=True`). Session B: send `"yes"` |
+| **Expected** | Session B processes "yes" as normal chat (no pending action in its state) |
+| **Failure** | Session B executes Session A's pending email |
+
+### Test 8.3 — Concurrent Sessions
+| Field | Detail |
+|---|---|
+| **Input** | Fire 5 concurrent requests with different `session_id`s, each asking different questions |
+| **Expected** | Each session receives independent, correct responses. No cross-contamination |
+| **Failure** | Responses mixed up, or database deadlock |
+
+---
+
+## 9. Rate Limiting
+
+### Test 9.1 — Under Limit
+| Field | Detail |
+|---|---|
+| **Input** | Send 19 requests in 1 minute with the same `session_id` |
+| **Expected** | All 19 return normal responses |
+| **Failure** | Premature rate limit trigger |
+
+### Test 9.2 — At Limit
+| Field | Detail |
+|---|---|
+| **Input** | Send 21 requests in 1 minute with the same `session_id` |
+| **Expected** | First 20 succeed. Request #21 returns `{"intent": "error", "reply": "Too many requests. Please slow down."}` |
+| **Failure** | Request #21 succeeds, or rate limit triggers too early |
+
+### Test 9.3 — Window Reset
+| Field | Detail |
+|---|---|
+| **Input** | Send 20 requests, wait 61 seconds, send request #21 |
+| **Expected** | Request #21 succeeds — window has reset |
+| **Failure** | Still rate-limited after window expiry |
+
+### Test 9.4 — Cross-Session Independence
+| Field | Detail |
+|---|---|
+| **Input** | Session A: send 20 requests (hit limit). Session B: send 1 request |
+| **Expected** | Session B's request succeeds — rate limit is per-session |
+| **Failure** | Session B is also rate-limited |
+
+---
+
+## 10. Continuous Voice Mode
+
+### Test 10.1 — Flag Pass-Through
+| Field | Detail |
+|---|---|
+| **Input** | `{"session_id": "c1", "message": "Hello", "voice_response": true, "continuous_mode": true}` |
+| **Expected** | Response includes `"continuous": true` alongside `audio_response` |
+| **Failure** | `continuous` field missing from response |
+
+### Test 10.2 — Flag Defaults to False
+| Field | Detail |
+|---|---|
+| **Input** | `{"session_id": "c2", "message": "Hello"}` (no `continuous_mode` field) |
+| **Expected** | Response includes `"continuous": false` (or field absent) |
+| **Failure** | `continuous` defaults to `true` when not specified |
+
+### Test 10.3 — Continuous Mode Without Voice
+| Field | Detail |
+|---|---|
+| **Input** | `{"session_id": "c3", "message": "Hello", "voice_response": false, "continuous_mode": true}` |
+| **Expected** | Normal text response with empty `audio_response` and `"continuous": true` |
+| **Failure** | TTS triggered despite `voice_response=false` |
+
+---
+
+## Quick Execution Checklist
+
+```bash
+# Health check
+curl http://localhost:8000/health
+# Expected: {"status": "ok"}
+
+# Basic chat
+curl -X POST http://localhost:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{"session_id": "test-1", "message": "Hello"}'
+
+# Rate limit test (run in loop)
+for i in $(seq 1 21); do
+  curl -s -X POST http://localhost:8000/chat \
+    -H "Content-Type: application/json" \
+    -d '{"session_id": "rate-test", "message": "ping"}' | jq .intent
+done
+# Expected: 20x "other", then "error"
+```

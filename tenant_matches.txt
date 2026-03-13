@@ -1,0 +1,22 @@
+657: , tenant_id='default')
+762: tenant_id=tenant_id,
+954: tenant_id=state.get(
+1271: profile = get_user_profile(session_id, tenant_id='default') if session_id else {}
+1286: summary = get_conversation_summary(session_id, tenant_id='default') if session_id else ""
+1292: past_history = get_session_history(session_id, tenant_id='default') if session_id else []
+1391: recent_turns = get_session_history(session_id, tenant_id='default') if session_id else []
+1535: save_message(session_id, "user", message, tenant_id='default')
+1536: save_message(session_id, "assistant", reply, tenant_id='default')
+1865: tenant_id=tenant_id,
+1949: tenant_id=state.get(
+2074: save_session_state(session_id, state, tenant_id='default')
+2185: save_session_state(session_id, state, tenant_id='default')
+2274: history = get_session_history(session_id, tenant_id='default') if session_id else []
+2275: summary = get_conversation_summary(session_id, tenant_id='default') if session_id else ""
+2276: profile = get_user_profile(session_id, tenant_id='default') if session_id else {}
+2396: get_session_history(session_id, tenant_id='default')
+2515: , tenant_id='default')
+2519: , tenant_id='default')
+2522: , tenant_id='default')
+2529: profile = get_user_profile(session_id, tenant_id='default')
+2835: tenant_id=tenant_id,

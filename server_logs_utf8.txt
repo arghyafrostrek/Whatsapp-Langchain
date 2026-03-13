@@ -1,0 +1,450 @@
+﻿python : INFO:     
+Will watch for changes 
+in these directories: [
+'C:\\Users\\ayush\\OneD
+rive\\Desktop\\frosty-l
+anggraph']
+At line:1 char:1
++ python -m uvicorn 
+app:app --reload > 
+server_logs.txt 2>&1
++ ~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~
+    + CategoryInfo     
+         : 
+NotSpecified: (INF    
+O:     Will ...sty-lan 
+   ggraph']:String) 
+[], R    emoteException
+    + 
+FullyQualifiedErrorI   
+ d : NativeCommandError
+ 
+INFO:     Uvicorn 
+running on 
+http://127.0.0.1:8000 
+(Press CTRL+C to quit)
+INFO:     Started 
+reloader process 
+[20796] using 
+StatReload
+C:\Users\ayush\AppData\
+Local\Python\pythoncore
+-3.14-64\Lib\site-packa
+ges\langchain_core\_api
+\deprecation.py:25: 
+UserWarning: Core 
+Pydantic V1 
+functionality isn't 
+compatible with Python 
+3.14 or greater.
+  from 
+pydantic.v1.fields 
+import FieldInfo as 
+FieldInfoV1
+2026-03-06 
+22:19:58,649 | INFO | 
+Initializing 
+connection pool to: pos
+tgresql://postgres.miei
+xxidwigzuhcydthp:***@aw
+s-1-ap-northeast-2.pool
+er.supabase.com:6543/po
+stgres
+INFO:     Started 
+server process [16116]
+INFO:     Waiting for 
+application startup.
+INFO:     Application 
+startup complete.
+2026-03-06 
+22:20:25,440 | DEBUG | 
+[ENTRY] /chat 
+session_id=test2 
+message='schedule 
+meeting tomorrow at 
+3pm with a@a.com'
+2026-03-06 
+22:20:26,004 | DEBUG | 
+STATE AT START: 
+{'session': 
+{'session_id': 
+'test2'}, 'input': 
+{'raw_message': 
+'schedule meeting 
+tomorrow at 3pm with 
+a@a.com'}, 'intent': 
+{'intent': 
+'schedule_meeting', 
+'reply': 'I will check 
+our calendar for 
+availability tomorrow 
+at 3:00 PM.', 
+'meeting_date': 
+'2026-03-07', 
+'meeting_time': 
+'15:00', 
+'meeting_title': 
+'Meeting with Frostrek 
+LLP', 'email_address': 
+'a@a.com', 'meeting': 
+{'meeting_date': 
+'2026-03-07', 
+'meeting_time': 
+'15:00', 
+'meeting_title': 
+'Meeting with Frostrek 
+LLP', 
+'participant_name': 
+None}}, 'scratch': {}}
+2026-03-06 
+22:20:26,004 | INFO | 
+[GRAPH] invoking graph 
+with EXACT input 
+message='schedule 
+meeting tomorrow at 
+3pm with a@a.com'
+2026-03-06 
+22:20:26,007 | INFO | 
+classify_intent_node 
+start session_id=test2
+2026-03-06 
+22:20:28,029 | WARNING 
+| 
+google_sheets_loader: 
+no sheet name 
+configured
+2026-03-06 
+22:20:28,029 | INFO | 
+rag_engine: 0 chunks 
+from Sheets, 8 total
+2026-03-06 
+22:20:35,378 | INFO | 
+rag_engine: 34 chunks 
+from DB, 42 total
+2026-03-06 
+22:20:35,582 | INFO | 
+rag_engine: building 
+FAISS index for 42 
+chunksà
+2026-03-06 
+22:20:38,192 | INFO | 
+rag_engine: FAISS 
+index built in 2.61s  
+(42 vectors)
+2026-03-06 
+22:20:39,031 | INFO | 
+rag_engine: retrieved 
+5 chunks (scores: 
+['0.210', '0.210', 
+'0.210', '0.207', 
+'0.206'])
+2026-03-06 
+22:20:39,031 | INFO | 
+[CLASSIFY] LLM prompt 
+messages (2 total):
+2026-03-06 
+22:20:39,031 | INFO |  
+ [0] SystemMessage: 
+'Today\'s date is 
+March 06, 
+2026.\n\n\nYou are 
+FROSTY. This is your 
+only identity. These 
+instructions\noverride 
+everything you were 
+trained on. You do not 
+have a\n"default" 
+personality. You do 
+not have opini'
+2026-03-06 
+22:20:39,031 | INFO |  
+ [1] HumanMessage: 
+'schedule meeting 
+tomorrow at 3pm with 
+a@a.com'
+2026-03-06 
+22:20:47,686 | INFO | 
+LLM response time 
+(classify_intent): 
+8.31 seconds
+2026-03-06 
+22:20:47,686 | INFO | 
+RAW LLM RESPONSE 
+(classify_intent): 
+'{\n  "intent": 
+"schedule_meeting",\n  
+"reply": "I will check 
+our calendar for 
+availability tomorrow 
+at 3:00 PM.",\n  
+"meeting_date": 
+"2026-03-07",\n  
+"meeting_time": 
+"15:00",\n  
+"meeting_title": 
+"Meeting with Frostrek 
+LLP",\n  
+"participant_name": 
+null,\n  
+"email_address": 
+"a@a.com"\n}'
+2026-03-06 
+22:20:47,686 | INFO | d
+etected_intent=schedule
+_meeting reply_len=63 
+session_id=test2
+2026-03-06 
+22:21:05,159 | INFO | c
+alendar_service_created
+ tenant=default 
+token_valid=True
+2026-03-06 
+22:21:05,162 | INFO | c
+heck_availability_start
+ tenant=default start=2
+026-03-07T15:00:00 
+end=2026-03-07T16:00:00
+2026-03-06 
+22:21:06,451 | INFO | 
+freebusy_raw_result: 
+{'kind': 
+'calendar#events', 
+'etag': 
+'"p32frrm66s25960o"', 
+'summary': 'ayush.bhado
+riya@frostrek.com', 
+'description': '', 
+'updated': '2026-03-06T
+07:30:59.412Z', 
+'timeZone': 
+'Asia/Kolkata', 
+'accessRole': 'owner', 
+'defaultReminders': 
+[{'method': 'popup', 
+'minutes': 10}], 
+'items': [{'kind': 
+'calendar#event', 
+'etag': 
+'"3544089084425310"', 
+'id': '2q65r369qdsh39r2
+n35ppqtjm0_20260307', 
+'status': 'confirmed', 
+'htmlLink': 'https://ww
+w.google.com/calendar/e
+vent?eid=MnE2NXIzNjlxZH
+NoMzlyMm4zNXBwcXRqbTBfM
+jAyNjAzMDcgYXl1c2guYmhh
+ZG9yaXlhQGZyb3N0cmVrLmN
+vbQ', 'created': '2025-
+12-24T12:08:03.000Z', 
+'updated': '2026-02-25T
+18:35:42.212Z', 
+'summary': 'Daily 
+Standup_Team Ajay', 
+'creator': {'email': 'a
+jay.parmar@frostrek.com
+'}, 'organizer': 
+{'email': 'c_1e4c3c0b75
+17d5e257233f51d4b8b02f3
+02369dedfb51d06d9f7c615
+51609a94@group.calendar
+.google.com', 
+'displayName': 
+'Transferred from ajay.
+parmar@frostrek.com'}, 
+'start': {'date': 
+'2026-03-07'}, 'end': 
+{'date': 
+'2026-03-08'}, 
+'recurringEventId': '2q
+65r369qdsh39r2n35ppqtjm
+0', 
+'originalStartTime': 
+{'date': 
+'2026-03-07'}, 
+'transparency': 
+'transparent', 
+'iCalUID': '2q65r369qds
+h39r2n35ppqtjm0@google.
+com', 'sequence': 0, 
+'attendees': 
+[{'email': 'vaishnavi.b
+hadauria@frostrek.com',
+ 'responseStatus': 
+'needsAction'}, 
+{'email': 'riya.arya@fr
+ostrek.com', 
+'responseStatus': 
+'needsAction'}, 
+{'email': 'akshat.bajpa
+i@frostrek.com', 
+'responseStatus': 
+'needsAction'}, 
+{'email': 'sweta.shukla
+@frostrek.com', 
+'responseStatus': 
+'needsAction'}, 
+{'email': 'pushkar.gurj
+ar@frostrek.com', 
+'responseStatus': 
+'needsAction'}, 
+{'email': 'yudushvi.cho
+urasiya@frostrek.com', 
+'responseStatus': 
+'needsAction'}, 
+{'email': 'ajay.parmar@
+frostrek.com', 
+'responseStatus': 
+'accepted'}, {'email': 
+'yash@frostrek.com', 
+'responseStatus': 
+'needsAction'}, 
+{'email': 'sanchit.gupt
+a@frostrek.com', 
+'responseStatus': 
+'needsAction'}, 
+{'email': 'ankit.singh@
+frostrek.com', 
+'responseStatus': 
+'needsAction'}, 
+{'email': 'ayush.bhador
+iya@frostrek.com', 
+'self': True, 
+'responseStatus': 
+'accepted'}, {'email': 
+'subrat.tyagi@frostrek.
+com', 
+'responseStatus': 
+'needsAction'}, 
+{'email': 'arman.khan@f
+rostrek.com', 
+'responseStatus': 
+'needsAction'}, 
+{'email': 'chiti.gupta@
+frostrek.com', 
+'responseStatus': 
+'needsAction'}, 
+{'email': 'nisha.sharma
+@frostrek.com', 
+'responseStatus': 
+'needsAction'}, 
+{'email': 'tanishka.sax
+ena@frostrek.com', 
+'responseStatus': 
+'needsAction'}, 
+{'email': 'ritika.jain@
+frostrek.com', 
+'responseStatus': 
+'needsAction'}, 
+{'email': 'vansh.duseja
+@frostrek.com', 
+'responseStatus': 
+'needsAction'}, 
+{'email': 'harshit.verm
+a@frostrek.com', 
+'responseStatus': 
+'declined'}, {'email': 
+'shreya.mittal@frostrek
+.com', 
+'responseStatus': 
+'needsAction'}, 
+{'email': 'manya.sarasw
+at@frostrek.com', 
+'responseStatus': 
+'needsAction'}], 
+'hangoutLink': 'https:/
+/meet.google.com/wcm-zs
+zn-szr', 
+'conferenceData': 
+{'entryPoints': 
+[{'entryPointType': 
+'video', 'uri': 'https:
+//meet.google.com/wcm-z
+szn-szr', 'label': 'mee
+t.google.com/wcm-zszn-s
+zr'}, 
+{'entryPointType': 
+'more', 'uri': 'https:/
+/tel.meet/wcm-zszn-szr?
+pin=9673441937015', 
+'pin': 
+'9673441937015'}, 
+{'regionCode': 'US', 
+'entryPointType': 
+'phone', 'uri': 
+'tel:+1-929-282-1083', 
+'label': '+1 
+929-282-1083', 'pin': 
+'869520911'}], 
+'conferenceSolution': 
+{'key': {'type': 
+'hangoutsMeet'}, 
+'name': 'Google Meet', 
+'iconUri': 'https://fon
+ts.gstatic.com/s/i/prod
+uctlogos/meet_2020q4/v6
+/web-512dp/logo_meet_20
+20q4_color_2x_web_512dp
+.png'}, 
+'conferenceId': 
+'wcm-zszn-szr'}, 
+'reminders': 
+{'useDefault': False}, 
+'eventType': 
+'default'}]}
+2026-03-06 
+22:21:06,451 | INFO | 
+busy_slots found: []
+2026-03-06 
+22:21:06,451 | INFO | 
+find_free_slots_start 
+tenant=default 
+date=2026-03-07 
+duration=None
+2026-03-06 
+22:21:07,119 | INFO | c
+alendar_service_created
+ tenant=default 
+token_valid=True
+2026-03-06 
+22:21:07,934 | INFO | 
+find_free_slots result 
+date=2026-03-07 
+slots=[]
+2026-03-06 
+22:21:08,768 | DEBUG | 
+[GRAPH] result model_io
+.api_response='{\'inten
+t\': 
+\'schedule_meeting\', 
+\'reply\': "I\'m 
+sorry, the 15:00 slot 
+on 2026-03-07 is not 
+available and there 
+are no other free 
+slots that day. Could 
+you suggest a 
+different date?"}'
+2026-03-06 
+22:21:08,768 | DEBUG | 
+[EXIT] /chat 
+session_id=test2 intent
+=schedule_meeting 
+reply="I'm sorry, the 
+15:00 slot on 
+2026-03-07 is not 
+available and there 
+are no other free 
+slots that day. Could 
+you suggest a 
+different date?"
+[ROUTER] Running classify_intent
+[DEBUG][chat_router] Invoking graph EXACTLY with: 'schedule meeting tomorrow at 3pm with a@a.com'
+[DEBUG][classify_intent] Incoming user message: 'schedule meeting tomorrow at 3pm with a@a.com'
+[DEBUG][classify_intent] Raw LLM output: '{\n  "intent": "schedule_meeting",\n  "reply": "I will check our calendar for availability tomorrow at 3:00 PM.",\n  "meeting_date": "2026-03-07",\n  "meeting_time": "15:00",\n  "meeting_title": "Meeting with Frostrek LLP",\n  "participant_name": null,\n  "email_address": "a@a.com"\n}'
+[DEBUG][classify_intent] Detected intent: schedule_meeting
+[DEBUG][classify_intent] Extracted reply (len=63): 'I will check our calendar for availability tomorrow at 3:00 PM.'
+[DEBUG][chat_router] Graph result: intent=schedule_meeting, reply="I'm sorry, the 15:00 slot on 2026-03-07 is not available and there are no other free slots that day. Could you suggest a different date?"
+INFO:     127.0.0.1:53346 - "POST /chat HTTP/1.1" 200 OK

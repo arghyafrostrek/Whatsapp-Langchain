@@ -1,0 +1,420 @@
+# Frosty AI Assistant — Backend Documentation
+
+> **Project**: Frosty LangGraph Backend  
+> **Stack**: FastAPI + LangGraph + OpenAI + PostgreSQL (Supabase)  
+> **Last Updated**: 2026-02-28
+
+---
+
+## Architecture Overview
+
+```mermaid
+flowchart TD
+    A["Client (Frontend)"] -->|"POST /chat"| B["app.py (FastAPI)"]
+    B -->|"Rate Limit + Validation"| C{"Audio?"}
+    C -->|"Yes"| D["voice_tool.py (Whisper STT)"]
+    C -->|"No"| E["Use text message"]
+    D --> E
+    E --> F{"Awaiting Confirmation?"}
+    F -->|"Yes"| G["handle_confirmation()"]
+    F -->|"No"| H["LangGraph (main.py)"]
+    H --> I["classify_intent_node"]
+    I -->|"schedule_meeting"| J["schedule_meeting_node"]
+    I -->|"send_email"| K["email_flow_node"]
+    I -->|"normal_chat / other"| L["normal_chat_node"]
+    J --> M["Google Calendar API"]
+    K --> N["SMTP Email"]
+    G --> O["Response"]
+    J --> O
+    K --> O
+    L --> O
+    O -->|"voice_response?"| P["tts_tool.py (TTS)"]
+    P --> Q["JSON Response + audio_response"]
+    O --> Q
+```
+
+---
+
+## Project Structure
+
+```
+frosty-langgraph/
+├── app.py                  # FastAPI server, /chat and /health endpoints
+├── main.py                 # LangGraph definition, chat_router()
+├── nodes.py                # All LangGraph node functions
+├── state.py                # TypedDict state definitions
+├── config.py               # Settings loader (env vars)
+├── db_config.py            # DB connection + table creation
+├── session_store.py        # Session history, state, summary, profile DB ops
+├── knowledge_base.py       # Company knowledge context
+├── logger_config.py        # Centralized logging
+├── requirements.txt        # Python dependencies
+├── Dockerfile              # Production Docker config
+├── .dockerignore            # Docker build exclusions
+├── .env                    # Environment variables (secrets)
+├── tools/
+│   ├── llm_tool.py         # LLM intent extraction with memory
+│   ├── calendar_tool.py    # Google Calendar event creation
+│   ├── email_tool.py       # SMTP email sending
+│   ├── voice_tool.py       # Whisper STT (audio → text)
+│   └── tts_tool.py         # OpenAI TTS (text → audio)
+└── memory/
+    ├── __init__.py
+    └── user_profile.py     # User profile extraction & persistence
+```
+
+---
+
+## File-by-File Reference
+
+### Core Files
+
+#### [app.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/app.py)
+FastAPI server with production hardening.
+
+| Feature | Detail |
+|---|---|
+| `GET /health` | Returns `{"status": "ok"}` |
+| `POST /chat` | Main chat endpoint |
+| Rate limiting | 20 requests/min per session_id (in-memory) |
+| Env validation | Checks `OPENAI_API_KEY`, `DATABASE_URL`, `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS` on startup |
+| Error handling | Global exception handler + endpoint-level try/except |
+
+#### [main.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/main.py)
+LangGraph definition and routing.
+
+- **[chat_router(session_id, state, user_message)](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/main.py#63-92)** — main entry point
+  - Loads persisted session state from DB
+  - **Confirmation guard**: if `awaiting_confirmation == True`, routes directly to [handle_confirmation()](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py#70-134) (bypasses graph)
+  - Otherwise invokes the LangGraph
+- **Graph structure**: [classify_intent](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py#140-253) → conditional edges → [schedule_meeting](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py#255-342) / [email_flow](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py#344-406) / [normal_chat](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py#448-592)
+
+#### [nodes.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py)
+All LangGraph node functions (~550 lines).
+
+| Node | Purpose |
+|---|---|
+| [extract_email_node](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py#32-70) | Regex-extracts email addresses from messages |
+| [handle_confirmation](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py#70-134) | Handles yes/no responses for email confirmation flow |
+| [classify_intent_node](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py#140-253) | LLM-based intent classification with sliding window memory (last 10 messages), profile injection, conversation summary, response time logging |
+| [schedule_meeting_node](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py#255-342) | Validates meeting fields → parses date/time to ISO → calls [create_calendar_event()](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/tools/calendar_tool.py#8-33) → returns Google Calendar link |
+| [email_flow_node](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py#344-406) | Extracts recipient/subject/body → sets `awaiting_confirmation=True` → asks user to confirm |
+| [normal_chat_node](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py#448-592) | Full conversational AI with Frosty persona, sliding window memory, profile injection, summary generation (every 10 messages), profile extraction via `memory.user_profile` |
+
+#### [state.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/state.py)
+TypedDict definitions for the entire state tree.
+
+```
+State
+├── session: SessionInfo (session_id, user_id, etc.)
+├── input: InputMessage (raw_message, audio_url, etc.)
+├── intent: IntentPayload (intent, reply, meeting data, email data)
+├── email_flow: EmailFlowState (draft, pending_confirmation, sent)
+├── meeting_flow: MeetingFlowState (validated, availability, events)
+├── voice: VoiceState
+├── knowledge_base: KnowledgeBaseContext
+├── model_io: ModelIOState (api_response, debug)
+├── memory_keys, scratch: Dict
+├── awaiting_confirmation: bool
+├── recipient, subject, body: str (for email confirmation)
+```
+
+---
+
+### Tools
+
+#### [tools/llm_tool.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/tools/llm_tool.py)
+LLM-based intent + data extraction.
+
+- **Sliding window**: loads last 10 messages from DB as role-based context
+- **Profile injection**: loads user profile after system prompt
+- **Conversation summary**: injected when available
+- **Company knowledge**: ground truth context
+- **Response time logging**: logs elapsed seconds for every LLM call
+- Returns structured JSON with [intent](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/main.py#24-27), `reply`, and extracted fields
+
+#### [tools/calendar_tool.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/tools/calendar_tool.py)
+Google Calendar integration using service account.
+
+```python
+create_calendar_event(summary, description, start_time, end_time) → str (htmlLink)
+```
+
+- Uses `google.oauth2.service_account` credentials
+- Creates events on `primary` calendar
+- Timezone: `Asia/Kolkata`
+- Requires `GOOGLE_APPLICATION_CREDENTIALS` env var pointing to service account JSON
+
+#### [tools/email_tool.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/tools/email_tool.py)
+SMTP email sender.
+
+```python
+send_email(to_email, subject, body) → bool
+```
+
+- Uses `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` env vars
+- TLS connection on port 587
+- Returns `True`/`False` for success/failure
+
+#### [tools/voice_tool.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/tools/voice_tool.py)
+Speech-to-Text via OpenAI Whisper.
+
+```python
+transcribe_audio(base64_audio: str) → str
+```
+
+- Decodes base64 → writes temp `.wav` file → sends to `whisper-1`
+- Returns transcribed text
+- Raises `ValueError` on bad base64, `RuntimeError` on Whisper failure
+
+#### [tools/tts_tool.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/tools/tts_tool.py)
+Text-to-Speech via OpenAI TTS.
+
+```python
+generate_speech(text: str) → str (base64)
+```
+
+- Model: `gpt-4o-mini-tts`, Voice: `alloy`
+- Returns base64-encoded audio (utf-8)
+- Returns empty string on failure
+
+---
+
+### Memory System
+
+#### [memory/user_profile.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/memory/user_profile.py)
+Structured user profile persistence.
+
+| Function | Purpose |
+|---|---|
+| [get_user_profile(session_id)](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/session_store.py#235-278) | Retrieve profile from DB |
+| [update_user_profile(session_id, name, email)](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/session_store.py#279-335) | Merge-update profile fields |
+| [extract_and_save_profile(session_id, message)](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/memory/user_profile.py#67-94) | Regex detect "my name is X" / "my email is X" and auto-persist |
+
+#### [session_store.py](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/session_store.py)
+Database operations for all session data.
+
+| Function | Purpose |
+|---|---|
+| [get_session_history(session_id)](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/session_store.py#10-48) | Load conversation messages (chronological) |
+| [save_message(session_id, role, content)](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/session_store.py#50-83) | Persist a message |
+| [get_session_state(session_id)](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/session_store.py#85-123) | Load serialized graph state |
+| [save_session_state(session_id, state)](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/session_store.py#124-160) | Persist graph state |
+| [get_conversation_summary(session_id)](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/session_store.py#161-199) | Load running summary |
+| [update_conversation_summary(session_id, summary)](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/session_store.py#200-234) | Update summary |
+| [get_user_profile(session_id)](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/session_store.py#235-278) | Load profile (name, email, language, timezone) |
+| [update_user_profile(session_id, data)](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/session_store.py#279-335) | Merge-update profile |
+
+---
+
+### Database Schema
+
+Three tables (auto-created on startup via `db_config.init_conversation_table()`):
+
+```sql
+-- Conversation messages
+conversation_memory (
+    id SERIAL PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    role TEXT NOT NULL,          -- "user" or "assistant"
+    content TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)
+
+-- Session state + conversation summary
+session_state (
+    session_id TEXT PRIMARY KEY,
+    state_data TEXT NOT NULL,    -- JSON serialized graph state
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    conversation_summary TEXT DEFAULT NULL
+)
+
+-- User profiles
+user_profile (
+    session_id TEXT PRIMARY KEY,
+    name TEXT,
+    email TEXT,
+    preferred_language TEXT,
+    timezone TEXT,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)
+```
+
+---
+
+## API Reference
+
+### `GET /health`
+
+```json
+// Response
+{"status": "ok"}
+```
+
+### `POST /chat`
+
+**Request:**
+```json
+{
+    "session_id": "unique-session-id",
+    "message": "Hello",              // Optional (if audio provided)
+    "audio": "base64_encoded_audio", // Optional (if message provided)
+    "voice_response": false          // Optional, default false
+}
+```
+
+> At least one of [message](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/session_store.py#50-83) or [audio](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/tools/voice_tool.py#7-59) must be provided.
+
+**Response:**
+```json
+{
+    "intent": "normal_chat | schedule_meeting | send_email | confirmation_reply | error",
+    "reply": "Assistant's text response",
+    "audio_response": "base64_encoded_audio_or_empty",
+    "audio_mime": "audio/wav"
+}
+```
+
+**Intent values:**
+
+| Intent | Trigger |
+|---|---|
+| [normal_chat](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py#448-592) | General conversation |
+| [schedule_meeting](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/nodes.py#255-342) | User wants to schedule a meeting |
+| [send_email](file:///c:/Users/ayush/OneDrive/Desktop/frosty-langgraph/tools/email_tool.py#19-72) | User wants to send an email |
+| `confirmation_reply` | Response to email confirmation prompt |
+| `error` | Validation or processing error |
+
+---
+
+## Request Flow
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant A as app.py
+    participant R as chat_router
+    participant G as LangGraph
+    participant DB as PostgreSQL
+
+    C->>A: POST /chat {session_id, message/audio}
+    A->>A: Rate limit check
+    A->>A: STT if audio provided
+    A->>R: chat_router(session_id, state, message)
+    R->>DB: Load session state
+    
+    alt Awaiting Confirmation
+        R->>R: handle_confirmation(yes/no)
+        R->>DB: Update state
+    else Normal Flow
+        R->>G: graph.invoke(state)
+        G->>G: classify_intent_node (LLM)
+        alt schedule_meeting
+            G->>G: schedule_meeting_node
+            G-->>G: Google Calendar API
+        else send_email
+            G->>G: email_flow_node
+            G->>DB: Save state (awaiting_confirmation)
+        else normal_chat
+            G->>G: normal_chat_node (LLM)
+            G->>DB: Save messages + profile
+        end
+        R->>DB: Save session state
+    end
+    
+    A->>A: TTS if voice_response=true
+    A->>C: JSON response
+```
+
+---
+
+## Environment Variables
+
+| Variable | Required | Purpose |
+|---|---|---|
+| `OPENAI_API_KEY` | ✅ | OpenAI API (LLM, Whisper, TTS) |
+| `DATABASE_URL` | ✅ | PostgreSQL connection string |
+| `SMTP_HOST` | ✅ | Email server (e.g., `smtp.gmail.com`) |
+| `SMTP_PORT` | ❌ | Email port (default: `587`) |
+| `SMTP_USER` | ✅ | Email account username |
+| `SMTP_PASS` | ✅ | Email account password / app password |
+| `SMTP_FROM` | ❌ | Sender email address |
+| `GOOGLE_APPLICATION_CREDENTIALS` | ❌ | Path to Google service account JSON (for Calendar) |
+| `PORT` | ❌ | Server port (default: `8000`) |
+
+---
+
+## Docker Deployment
+
+**Build:**
+```bash
+docker build -t frosty-langgraph .
+```
+
+**Run (with env file):**
+```bash
+docker run -d --name frosty -p 8000:8000 --env-file .env frosty-langgraph
+```
+
+**Run (with inline env vars):**
+```bash
+docker run -d --name frosty -p 8000:8000 \
+  -e OPENAI_API_KEY=sk-... \
+  -e DATABASE_URL=postgresql://... \
+  -e SMTP_HOST=smtp.gmail.com \
+  -e SMTP_USER=you@example.com \
+  -e SMTP_PASS=your_pass \
+  frosty-langgraph
+```
+
+**Verify:**
+```bash
+curl http://localhost:8000/health
+# → {"status": "ok"}
+```
+
+> For Google Calendar, mount credentials: `-v /path/to/creds.json:/app/credentials.json`
+
+---
+
+## Features Implemented
+
+| # | Feature | Status |
+|---|---|---|
+| 1 | LangGraph-based intent classification | ✅ |
+| 2 | Meeting scheduling via Google Calendar API | ✅ |
+| 3 | Email sending via SMTP with confirmation guard | ✅ |
+| 4 | Normal chat with Frosty persona | ✅ |
+| 5 | Sliding window memory (last 10 messages) | ✅ |
+| 6 | Conversation summary generation (every 10 messages) | ✅ |
+| 7 | Structured user profile memory (name, email) | ✅ |
+| 8 | Profile injection into all LLM calls | ✅ |
+| 9 | Company knowledge base context | ✅ |
+| 10 | Speech-to-Text (Whisper STT) | ✅ |
+| 11 | Text-to-Speech (gpt-4o-mini-tts) | ✅ |
+| 12 | Rate limiting (20 req/min per session) | ✅ |
+| 13 | Health check endpoint | ✅ |
+| 14 | Startup env validation | ✅ |
+| 15 | Response time logging on all LLM calls | ✅ |
+| 16 | Global error handling | ✅ |
+| 17 | Docker deployment ready | ✅ |
+| 18 | Production logging (no print statements) | ✅ |
+
+---
+
+## Remaining / Potential Work
+
+| # | Item | Notes |
+|---|---|---|
+| 1 | **Frontend integration** | Build UI that posts to `/chat`, plays `audio_response` |
+| 2 | **Google Calendar OAuth** | Currently uses service account — may need user-level OAuth for personal calendars |
+| 3 | **Rate limiter persistence** | Currently in-memory, resets on restart — consider Redis for multi-instance |
+| 4 | **Meeting confirmation guard** | Meetings are auto-created — may want a confirm step like email |
+| 5 | **File/image attachments** | State supports `image_url` but no processing logic yet |
+| 6 | **Multi-language support** | Profile has `preferred_language` field but no translation logic |
+| 7 | **Webhook integrations** | n8n-style webhook triggers not yet ported |
+| 8 | **Unit/integration tests** | No test suite exists yet |
+| 9 | **CI/CD pipeline** | No automated deployment pipeline |
+| 10 | **HTTPS / Auth** | No API authentication — needed before public deployment |
+| 11 | **Knowledge base from Google Sheets** | State supports `raw_sheet_data` but currently uses hardcoded placeholders |
+| 12 | **Ticket system** | State has `ticket_id`/`ticket_number` fields but no implementation |

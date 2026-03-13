@@ -1,0 +1,82 @@
+2026-03-13 12:05:33,923 | INFO | Initializing connection pool to: postgresql://postgres.mieixxidwigzuhcydthp:***@aws-1-ap-northeast-2.pooler.supabase.com:6543/postgres
+INFO:     Started server process [13033]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:50367 - "GET /health HTTP/1.1" 200 OK
+INFO:     2401:4900:1c31:7d0d:287c:7e42:734f:2dd7:0 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50371 - "GET /health HTTP/1.1" 200 OK
+2026-03-13 12:05:56,038 | DEBUG | [ENTRY] /chat session_id=test_session_1773383754 message='Hello Frosty!'
+2026-03-13 12:05:56,517 | DEBUG | STATE AT START: {'session': {'session_id': 'test_session_1773383754'}, 'input': {'raw_message': 'Hello Frosty!'}}
+2026-03-13 12:05:56,518 | INFO | [GRAPH] invoking graph with EXACT input message='Hello Frosty!'
+2026-03-13 12:05:56,528 | INFO | classify_intent_node start session_id=test_session_1773383754
+2026-03-13 12:05:59,811 | WARNING | RAG retrieval failed in classify_intent: No module named 'numpy'
+2026-03-13 12:06:00,346 | INFO | [CLASSIFY] LLM prompt messages (2 total):
+2026-03-13 12:06:00,346 | INFO |   [0] SystemMessage: "Today's date is March 13, 2026.\n\nYou are Frosty, the official AI assistant of Frostrek LLP.\n\nKnowledge Inputs Available (for reasoning only, never quote directly):\nServices: Frostrek LLP provides end-"
+2026-03-13 12:06:00,346 | INFO |   [1] HumanMessage: 'Hello Frosty!'
+2026-03-13 12:06:03,187 | INFO | LLM response time (classify_intent): 2.28 seconds
+2026-03-13 12:06:03,188 | INFO | RAW LLM RESPONSE (classify_intent): '{\n  "intent": "normal_chat",\n  "reply": "Hi there! How can I assist you today with Frostrek LLP?",\n  "meeting_date": null,\n  "meeting_time": null,\n  "meeting_title": null,\n  "participant_name": null,\n  "email_address": null,\n  "email_subject": null,\n  "email_body": null\n}'
+2026-03-13 12:06:03,188 | INFO | detected_intent=normal_chat reply_len=55 session_id=test_session_1773383754
+2026-03-13 12:06:03,191 | INFO | normal_chat: skipping LLM, using classify reply len=55
+2026-03-13 12:06:03,699 | DEBUG | [GRAPH] result model_io.api_response="{'intent': 'normal_chat', 'reply': 'Hi there! How can I assist you today with Frostrek LLP?'}"
+2026-03-13 12:06:03,699 | DEBUG | [EXIT] /chat session_id=test_session_1773383754 intent=normal_chat reply='Hi there! How can I assist you today with Frostrek LLP?'
+[ROUTER] Running classify_intent
+[DEBUG][chat_router] Invoking graph EXACTLY with: 'Hello Frosty!'
+[DEBUG][classify_intent] Incoming user message: 'Hello Frosty!'
+[DEBUG][classify_intent] Raw LLM output: '{\n  "intent": "normal_chat",\n  "reply": "Hi there! How can I assist you today with Frostrek LLP?",\n  "meeting_date": null,\n  "meeting_time": null,\n  "meeting_title": null,\n  "participant_name": null,\n  "email_address": null,\n  "email_subject": null,\n  "email_body": null\n}'
+[DEBUG][classify_intent] Detected intent: normal_chat
+[DEBUG][classify_intent] Extracted reply (len=55): 'Hi there! How can I assist you today with Frostrek LLP?'
+[DEBUG][chat_router] Graph result: intent=normal_chat, reply='Hi there! How can I assist you today with Frostrek LLP?'
+INFO:     127.0.0.1:50372 - "POST /chat HTTP/1.1" 200 OK
+2026-03-13 12:06:05,272 | DEBUG | [ENTRY] /chat session_id=test_session_1773383764 message="Schedule a meeting titled 'Design Sync' tomorrow at 3pm with bob@example.com"
+2026-03-13 12:06:05,796 | DEBUG | STATE AT START: {'session': {'session_id': 'test_session_1773383764'}, 'input': {'raw_message': "Schedule a meeting titled 'Design Sync' tomorrow at 3pm with bob@example.com"}}
+2026-03-13 12:06:05,797 | INFO | [GRAPH] invoking graph with EXACT input message="Schedule a meeting titled 'Design Sync' tomorrow at 3pm with bob@example.com"
+2026-03-13 12:06:05,798 | INFO | classify_intent_node start session_id=test_session_1773383764
+2026-03-13 12:06:09,099 | WARNING | RAG retrieval failed in classify_intent: No module named 'numpy'
+2026-03-13 12:06:09,627 | INFO | [CLASSIFY] LLM prompt messages (2 total):
+2026-03-13 12:06:09,628 | INFO |   [0] SystemMessage: "Today's date is March 13, 2026.\n\nYou are Frosty, the official AI assistant of Frostrek LLP.\n\nKnowledge Inputs Available (for reasoning only, never quote directly):\nServices: Frostrek LLP provides end-"
+2026-03-13 12:06:09,628 | INFO |   [1] HumanMessage: "Schedule a meeting titled 'Design Sync' tomorrow at 3pm with bob@example.com"
+2026-03-13 12:06:13,542 | INFO | LLM response time (classify_intent): 3.39 seconds
+2026-03-13 12:06:13,543 | INFO | RAW LLM RESPONSE (classify_intent): '{\n  "intent": "schedule_meeting",\n  "reply": "I can help you schedule the \'Design Sync\' meeting. Just to confirm, is tomorrow\'s date March 14, 2026, at 3 PM?",\n  "meeting_date": "2026-03-14",\n  "meeting_time": "15:00",\n  "meeting_title": "Design Sync",\n  "participant_name": "Bob",\n  "email_address": "bob@example.com",\n  "email_subject": null,\n  "email_body": null\n}'
+2026-03-13 12:06:13,543 | INFO | detected_intent=schedule_meeting reply_len=111 session_id=test_session_1773383764
+2026-03-13 12:06:14,436 | ERROR | Unhandled error in chat endpoint for session test_session_1773383764: No module named 'google_auth_oauthlib'
+2026-03-13 12:06:14,437 | DEBUG | [EXIT] /chat session_id=test_session_1773383764 intent=error reply='Something went wrong. Please try again.'
+[ROUTER] Running classify_intent
+[DEBUG][chat_router] Invoking graph EXACTLY with: "Schedule a meeting titled 'Design Sync' tomorrow at 3pm with bob@example.com"
+[DEBUG][classify_intent] Incoming user message: "Schedule a meeting titled 'Design Sync' tomorrow at 3pm with bob@example.com"
+[DEBUG][classify_intent] Raw LLM output: '{\n  "intent": "schedule_meeting",\n  "reply": "I can help you schedule the \'Design Sync\' meeting. Just to confirm, is tomorrow\'s date March 14, 2026, at 3 PM?",\n  "meeting_date": "2026-03-14",\n  "meeting_time": "15:00",\n  "meeting_title": "Design Sync",\n  "participant_name": "Bob",\n  "email_address":'
+[DEBUG][classify_intent] Detected intent: schedule_meeting
+[DEBUG][classify_intent] Extracted reply (len=111): "I can help you schedule the 'Design Sync' meeting. Just to confirm, is tomorrow's date March 14, 2026, at 3 PM?"
+INFO:     127.0.0.1:50384 - "POST /chat HTTP/1.1" 200 OK
+2026-03-13 12:06:15,566 | INFO | whatsapp_webhook: verification successful
+INFO:     127.0.0.1:50389 - "GET /webhook/whatsapp?hub.mode=subscribe&hub.verify_token=frosty2026&hub.challenge=challenge_123 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50390 - "POST /webhook/whatsapp HTTP/1.1" 200 OK
+2026-03-13 12:06:18,382 | INFO | slack_notifier: not connected for tenant=default — skipping
+2026-03-13 12:06:19,306 | INFO | intent_classifier: 'Hello from WhatsApp!' → off_topic
+2026-03-13 12:06:19,786 | INFO | whatsapp_webhook: calling chat_router for wa_1234567890
+2026-03-13 12:06:20,273 | DEBUG | STATE AT START: {'session': {'session_id': 'wa_1234567890', 'user_email': '', 'display_name': 'Test User'}, 'input': {'input_type': 'text', 'raw_message': 'Hello from WhatsApp!', 'normalized_text': 'Hello from WhatsApp!', 'is_voice': False}, 'intent': {'intent': 'normal_chat', 'reply': 'Hi! I’m Frosty. How can I help you today with Frostrek LLP?'}, 'email_flow': {'draft': {'has_draft': False}, 'pending_confirmation': {'awaiting_confirmation': False}, 'sent': {'sent': False}}, 'meeting_flow': {'validated': False}, 'voice': {'is_voice_input': False}, 'model_io': {'api_response': {'intent': 'normal_chat', 'reply': 'Hi! I’m Frosty. How can I help you today with Frostrek LLP?'}}, 'scratch': {}}
+2026-03-13 12:06:20,274 | INFO | [GRAPH] invoking graph with EXACT input message='Hello from WhatsApp!'
+2026-03-13 12:06:20,279 | INFO | classify_intent_node start session_id=wa_1234567890
+2026-03-13 12:06:23,625 | WARNING | RAG retrieval failed in classify_intent: No module named 'numpy'
+2026-03-13 12:06:24,152 | INFO | [CLASSIFY] LLM prompt messages (2 total):
+2026-03-13 12:06:24,152 | INFO |   [0] SystemMessage: "Today's date is March 13, 2026.\n\nYou are Frosty, the official AI assistant of Frostrek LLP.\n\nKnowledge Inputs Available (for reasoning only, never quote directly):\nServices: Frostrek LLP provides end-"
+2026-03-13 12:06:24,153 | INFO |   [1] HumanMessage: 'Hello from WhatsApp!'
+2026-03-13 12:06:26,531 | INFO | LLM response time (classify_intent): 1.84 seconds
+2026-03-13 12:06:26,532 | INFO | RAW LLM RESPONSE (classify_intent): '{\n  "intent": "normal_chat",\n  "reply": "Hi! How can I assist you today with Frostrek LLP?",\n  "meeting_date": null,\n  "meeting_time": null,\n  "meeting_title": null,\n  "participant_name": null,\n  "email_address": null,\n  "email_subject": null,\n  "email_body": null\n}'
+2026-03-13 12:06:26,532 | INFO | detected_intent=normal_chat reply_len=49 session_id=wa_1234567890
+2026-03-13 12:06:26,537 | INFO | normal_chat: skipping LLM, using classify reply len=49
+2026-03-13 12:06:27,085 | DEBUG | [GRAPH] result model_io.api_response="{'intent': 'normal_chat', 'reply': 'Hi! How can I assist you today with Frostrek LLP?'}"
+2026-03-13 12:06:28,557 | INFO | whatsapp: message sent to 123…7890
+[ROUTER] Running classify_intent
+[DEBUG][chat_router] Invoking graph EXACTLY with: 'Hello from WhatsApp!'
+[DEBUG][classify_intent] Incoming user message: 'Hello from WhatsApp!'
+[DEBUG][classify_intent] Raw LLM output: '{\n  "intent": "normal_chat",\n  "reply": "Hi! How can I assist you today with Frostrek LLP?",\n  "meeting_date": null,\n  "meeting_time": null,\n  "meeting_title": null,\n  "participant_name": null,\n  "email_address": null,\n  "email_subject": null,\n  "email_body": null\n}'
+[DEBUG][classify_intent] Detected intent: normal_chat
+[DEBUG][classify_intent] Extracted reply (len=49): 'Hi! How can I assist you today with Frostrek LLP?'
+[DEBUG][chat_router] Graph result: intent=normal_chat, reply='Hi! How can I assist you today with Frostrek LLP?'
+INFO:     2401:4900:1c31:7d0d:287c:7e42:734f:2dd7:0 - "GET /webhook/whatsapp HTTP/1.1" 400 Bad Request
+INFO:     2401:4900:1c31:7d0d:287c:7e42:734f:2dd7:0 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [13033]

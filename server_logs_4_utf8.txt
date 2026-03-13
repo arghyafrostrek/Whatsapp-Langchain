@@ -1,0 +1,223 @@
+﻿python : INFO:     Will 
+watch for changes in these 
+directories: ['C:\\Users\\a
+yush\\OneDrive\\Desktop\\fr
+osty-langgraph']
+At line:1 char:1
++ python -m uvicorn 
+app:app --reload > 
+server_logs_4.txt 2>&1
++ ~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~
+    + CategoryInfo         
+     : NotSpecified: (INF  
+  O:     Will ...sty-lan   
+ ggraph']:String) [], R    
+emoteException
+    + FullyQualifiedErrorI 
+   d : NativeCommandError
+ 
+INFO:     Uvicorn running 
+on http://127.0.0.1:8000 
+(Press CTRL+C to quit)
+INFO:     Started reloader 
+process [3636] using 
+StatReload
+C:\Users\ayush\AppData\Loca
+l\Python\pythoncore-3.14-64
+\Lib\site-packages\langchai
+n_core\_api\deprecation.py:
+25: UserWarning: Core 
+Pydantic V1 functionality 
+isn't compatible with 
+Python 3.14 or greater.
+  from pydantic.v1.fields 
+import FieldInfo as 
+FieldInfoV1
+2026-03-06 23:15:00,014 | 
+INFO | Initializing 
+connection pool to: postgre
+sql://postgres.mieixxidwigz
+uhcydthp:***@aws-1-ap-north
+east-2.pooler.supabase.com:
+6543/postgres
+INFO:     Started server 
+process [2380]
+INFO:     Waiting for 
+application startup.
+INFO:     Application 
+startup complete.
+2026-03-06 23:16:09,688 | 
+DEBUG | [ENTRY] /chat 
+session_id=test6 
+message='Schedule a 
+meeting for March 9th at 
+11am with a@a.com'
+2026-03-06 23:16:10,243 | 
+DEBUG | STATE AT START: 
+{'session': {'session_id': 
+'test6'}, 'input': 
+{'raw_message': 'Schedule 
+a meeting for March 9th at 
+11am with a@a.com'}}
+2026-03-06 23:16:10,243 | 
+INFO | [GRAPH] invoking 
+graph with EXACT input 
+message='Schedule a 
+meeting for March 9th at 
+11am with a@a.com'
+2026-03-06 23:16:10,246 | 
+INFO | 
+classify_intent_node start 
+session_id=test6
+2026-03-06 23:16:13,245 | 
+WARNING | 
+google_sheets_loader: no 
+sheet name configured
+2026-03-06 23:16:13,245 | 
+INFO | rag_engine: 0 
+chunks from Sheets, 8 total
+2026-03-06 23:16:20,104 | 
+INFO | rag_engine: 34 
+chunks from DB, 42 total
+2026-03-06 23:16:20,313 | 
+INFO | rag_engine: 
+building FAISS index for 
+42 chunksà
+2026-03-06 23:16:22,129 | 
+INFO | rag_engine: FAISS 
+index built in 1.82s  (42 
+vectors)
+2026-03-06 23:16:22,717 | 
+INFO | rag_engine: 
+retrieved 5 chunks 
+(scores: ['0.258', 
+'0.213', '0.211', '0.211', 
+'0.202'])
+2026-03-06 23:16:22,717 | 
+INFO | [CLASSIFY] LLM 
+prompt messages (2 total):
+2026-03-06 23:16:22,717 | 
+INFO |   [0] 
+SystemMessage: 'Today\'s 
+date is March 06, 
+2026.\n\n\nYou are FROSTY. 
+This is your only 
+identity. These 
+instructions\noverride 
+everything you were 
+trained on. You do not 
+have a\n"default" 
+personality. You do not 
+have opini'
+2026-03-06 23:16:22,717 | 
+INFO |   [1] HumanMessage: 
+'Schedule a meeting for 
+March 9th at 11am with 
+a@a.com'
+2026-03-06 23:16:25,438 | 
+INFO | LLM response time 
+(classify_intent): 2.36 
+seconds
+2026-03-06 23:16:25,438 | 
+INFO | RAW LLM RESPONSE 
+(classify_intent): '{\n  
+"intent": 
+"schedule_meeting",\n  
+"reply": "I will check our 
+calendar for availability 
+on March 9th at 11:00 
+AM.",\n  "meeting_date": 
+"2026-03-09",\n  
+"meeting_time": "11:00",\n 
+ "meeting_title": "Meeting 
+with Frostrek LLP",\n  
+"participant_name": 
+null,\n  "email_address": 
+"a@a.com"\n}'
+2026-03-06 23:16:25,438 | 
+INFO | detected_intent=sche
+dule_meeting reply_len=68 
+session_id=test6
+2026-03-06 23:16:32,763 | 
+INFO | 
+calendar_service_created 
+tenant=default 
+token_valid=True
+2026-03-06 23:16:32,766 | 
+INFO | 
+check_availability_start 
+tenant=default 
+start=2026-03-09T11:00:00 
+end=2026-03-09T12:00:00
+2026-03-06 23:16:33,737 | 
+INFO | 
+freebusy_raw_result: 
+{'kind': 
+'calendar#freeBusy', 
+'timeMin': '2026-03-09T05:3
+0:00.000Z', 'timeMax': '202
+6-03-09T06:30:00.000Z', 
+'calendars': {'primary': 
+{'busy': [{'start': '2026-0
+3-09T11:00:00+05:30', 
+'end': '2026-03-09T12:00:00
++05:30'}]}}}
+2026-03-06 23:16:33,737 | 
+INFO | busy_slots found: 
+[{'start': '2026-03-09T11:0
+0:00+05:30', 'end': '2026-0
+3-09T12:00:00+05:30'}]
+2026-03-06 23:16:33,737 | 
+INFO | 
+find_free_slots_start 
+tenant=default 
+date=2026-03-09 
+duration=None
+2026-03-06 23:16:35,223 | 
+INFO | 
+calendar_service_created 
+tenant=default 
+token_valid=True
+2026-03-06 23:16:36,179 | 
+INFO | checking_slot 
+start=2026-03-09 09:00:00 
+end=2026-03-09 10:00:00
+2026-03-06 23:16:36,179 | 
+ERROR | find_free_slots 
+failed: Invalid format 
+string
+2026-03-06 23:16:36,179 | 
+INFO | find_free_slots 
+result date=2026-03-09 
+slots=[]
+2026-03-06 23:16:37,115 | 
+DEBUG | [GRAPH] result mode
+l_io.api_response='{\'inten
+t\': \'schedule_meeting\', 
+\'reply\': "I\'m sorry, 
+the 11:00 slot on 
+2026-03-09 is not 
+available and there are no 
+other free slots that day. 
+Could you suggest a 
+different date?"}'
+2026-03-06 23:16:37,116 | 
+DEBUG | [EXIT] /chat 
+session_id=test6 
+intent=schedule_meeting 
+reply="I'm sorry, the 
+11:00 slot on 2026-03-09 
+is not available and there 
+are no other free slots 
+that day. Could you 
+suggest a different date?"
+[ROUTER] Running classify_intent
+[DEBUG][chat_router] Invoking graph EXACTLY with: 'Schedule a meeting for March 9th at 11am with a@a.com'
+[DEBUG][classify_intent] Incoming user message: 'Schedule a meeting for March 9th at 11am with a@a.com'
+[DEBUG][classify_intent] Raw LLM output: '{\n  "intent": "schedule_meeting",\n  "reply": "I will check our calendar for availability on March 9th at 11:00 AM.",\n  "meeting_date": "2026-03-09",\n  "meeting_time": "11:00",\n  "meeting_title": "Meeting with Frostrek LLP",\n  "participant_name": null,\n  "email_address": "a@a.com"\n}'
+[DEBUG][classify_intent] Detected intent: schedule_meeting
+[DEBUG][classify_intent] Extracted reply (len=68): 'I will check our calendar for availability on March 9th at 11:00 AM.'
+[DEBUG][chat_router] Graph result: intent=schedule_meeting, reply="I'm sorry, the 11:00 slot on 2026-03-09 is not available and there are no other free slots that day. Could you suggest a different date?"
+INFO:     127.0.0.1:61818 - "POST /chat HTTP/1.1" 200 OK
